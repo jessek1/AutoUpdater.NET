@@ -10,6 +10,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Windows.Forms;
 using AutoUpdaterDotNET.Properties;
+using static AutoUpdaterDotNET.AutoUpdater;
 
 namespace AutoUpdaterDotNET
 {
@@ -23,17 +24,20 @@ namespace AutoUpdaterDotNET
 
         private DateTime _startedAt;
 
+
         public DownloadUpdateDialog(string downloadURL)
         {
             InitializeComponent();
 
             _downloadURL = downloadURL;
 
+
             if (AutoUpdater.Mandatory && AutoUpdater.UpdateMode == Mode.ForcedDownload)
             {
                 ControlBox = false;
             }
         }
+       
 
         private void DownloadUpdateDialogLoad(object sender, EventArgs e)
         {
@@ -116,11 +120,18 @@ namespace AutoUpdaterDotNET
 
             if (asyncCompletedEventArgs.Error != null)
             {
-                MessageBox.Show(asyncCompletedEventArgs.Error.Message,
-                    asyncCompletedEventArgs.Error.GetType().ToString(), MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
-                _webClient = null;
+                if (!AutoUpdater.IsSilentMode)
+                {
+                    MessageBox.Show(asyncCompletedEventArgs.Error.Message,
+                        asyncCompletedEventArgs.Error.GetType().ToString(), MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                }
+                AutoUpdater.LogMessage($"{this.GetType()}", "WebClientOnDownloadFileCompleted", 
+                    asyncCompletedEventArgs.Error);
+
+               _webClient = null;
                 Close();
+                
                 return;
             }
 
@@ -160,7 +171,11 @@ namespace AutoUpdaterDotNET
             }
             catch (Exception e)
             {
-                MessageBox.Show(e.Message, e.GetType().ToString(), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                if (!AutoUpdater.IsSilentMode)
+                {
+                    MessageBox.Show(e.Message, e.GetType().ToString(), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                AutoUpdater.LogMessage($"{this.GetType()}", "WebClientOnDownloadFileCompleted", e);
                 _webClient = null;
                 Close();
                 return;
@@ -187,7 +202,11 @@ namespace AutoUpdaterDotNET
                 }
                 catch (Exception e)
                 {
-                    MessageBox.Show(e.Message, e.GetType().ToString(), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    if (!AutoUpdater.IsSilentMode)
+                    {
+                        MessageBox.Show(e.Message, e.GetType().ToString(), MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                    AutoUpdater.LogMessage($"{this.GetType()}", "WebClientOnDownloadFileCompleted", e);
                     _webClient = null;
                     Close();
                     return;
@@ -239,6 +258,7 @@ namespace AutoUpdaterDotNET
             catch (Win32Exception exception)
             {
                 _webClient = null;
+                AutoUpdater.LogMessage($"{this.GetType()}", "WebClientOnDownloadFileCompleted", exception);
                 if (exception.NativeErrorCode != 1223)
                     throw;
             }
@@ -269,16 +289,25 @@ namespace AutoUpdaterDotNET
                         var fileChecksum = BitConverter.ToString(hash).Replace("-", String.Empty).ToLowerInvariant();
 
                         if (fileChecksum == checksum.ToLower()) return true;
-
-                        MessageBox.Show(Resources.FileIntegrityCheckFailedMessage,
+                        if (!AutoUpdater.IsSilentMode)
+                        {
+                            MessageBox.Show(Resources.FileIntegrityCheckFailedMessage,
                             Resources.FileIntegrityCheckFailedCaption, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                        AutoUpdater.LogMessage(LogMessageEventArgs.Type.Error, $"DownloadUpdateDialog", "CompareChecksum", 
+                            Resources.FileIntegrityCheckFailedMessage);
                     }
                     else
                     {
                         if (AutoUpdater.ReportErrors)
                         {
-                            MessageBox.Show(Resources.HashAlgorithmNotSupportedMessage,
+                            if (!AutoUpdater.IsSilentMode)
+                            {
+                                MessageBox.Show(Resources.HashAlgorithmNotSupportedMessage,
                                 Resources.HashAlgorithmNotSupportedCaption, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                            AutoUpdater.LogMessage(LogMessageEventArgs.Type.Error, $"DownloadUpdateDialog", "CompareChecksum",
+                                Resources.HashAlgorithmNotSupportedMessage);
                         }
                     }
 
@@ -316,8 +345,16 @@ namespace AutoUpdaterDotNET
         /// <inheritdoc />
         protected override WebResponse GetWebResponse(WebRequest request, IAsyncResult result)
         {
-            WebResponse webResponse = base.GetWebResponse(request, result);
-            ResponseUri = webResponse.ResponseUri;
+            WebResponse webResponse = default(WebResponse);
+           
+                webResponse = base.GetWebResponse(request, result);
+                ResponseUri = webResponse.ResponseUri;
+            //} catch (Exception ex)
+            //{
+            //    Debug.WriteLine(ex.ToString());
+            //}
+            
+            
             return webResponse;
         }
     }
