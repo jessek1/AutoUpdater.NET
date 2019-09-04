@@ -334,79 +334,86 @@ namespace AutoUpdaterDotNET
         private static void BackgroundWorkerOnRunWorkerCompleted(object sender,
             RunWorkerCompletedEventArgs runWorkerCompletedEventArgs)
         {
-            if (!runWorkerCompletedEventArgs.Cancelled)
+            try
             {
-                if (runWorkerCompletedEventArgs.Result is DateTime)
+                if (!runWorkerCompletedEventArgs.Cancelled)
                 {
-                    SetTimer((DateTime)runWorkerCompletedEventArgs.Result);
-                }
-                else
-                {
-                    var args = runWorkerCompletedEventArgs.Result as UpdateInfoEventArgs;
-                    if (CheckForUpdateEvent != null)
+                    if (runWorkerCompletedEventArgs.Result is DateTime)
                     {
-                        CheckForUpdateEvent(args);
+                        SetTimer((DateTime)runWorkerCompletedEventArgs.Result);
                     }
                     else
                     {
-                        if (args != null)
+                        var args = runWorkerCompletedEventArgs.Result as UpdateInfoEventArgs;
+                        if (CheckForUpdateEvent != null)
                         {
-                            if (args.IsUpdateAvailable)
+                            CheckForUpdateEvent(args);
+                        }
+                        else
+                        {
+                            if (args != null)
                             {
-                                if (!IsWinFormsApplication)
+                                if (args.IsUpdateAvailable)
                                 {
-                                    Application.EnableVisualStyles();
-                                }
-
-                                if (Mandatory && UpdateMode == Mode.ForcedDownload)
-                                {
-                                    if (DownloadUpdate())
+                                    if (!IsWinFormsApplication)
                                     {
-                                        Exit();
+                                        Application.EnableVisualStyles();
                                     }
-                                }
-                                else
-                                {
-                                    if (Thread.CurrentThread.GetApartmentState().Equals(ApartmentState.STA))
+
+                                    if (Mandatory && UpdateMode == Mode.ForcedDownload)
                                     {
-                                        ShowUpdateForm();
+                                        if (DownloadUpdate())
+                                        {
+                                            Exit();
+                                        }
                                     }
                                     else
                                     {
-                                        Thread thread = new Thread(ShowUpdateForm);
-                                        thread.CurrentCulture = thread.CurrentUICulture = CultureInfo.CurrentCulture;
-                                        thread.SetApartmentState(ApartmentState.STA);
-                                        thread.Start();
-                                        thread.Join();
+                                        if (Thread.CurrentThread.GetApartmentState().Equals(ApartmentState.STA))
+                                        {
+                                            ShowUpdateForm();
+                                        }
+                                        else
+                                        {
+                                            Thread thread = new Thread(ShowUpdateForm);
+                                            thread.CurrentCulture = thread.CurrentUICulture = CultureInfo.CurrentCulture;
+                                            thread.SetApartmentState(ApartmentState.STA);
+                                            thread.Start();
+                                            thread.Join();
+                                        }
+                                    }
+
+                                    return;
+                                }
+                                else
+                                {
+                                    if (ReportErrors)
+                                    {
+                                        MessageBox.Show(Resources.UpdateUnavailableMessage,
+                                            Resources.UpdateUnavailableCaption,
+                                            MessageBoxButtons.OK, MessageBoxIcon.Information);
                                     }
                                 }
-
-                                return;
                             }
                             else
                             {
                                 if (ReportErrors)
                                 {
-                                    MessageBox.Show(Resources.UpdateUnavailableMessage,
-                                        Resources.UpdateUnavailableCaption,
-                                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    MessageBox.Show(
+                                        Resources.UpdateCheckFailedMessage,
+                                        Resources.UpdateCheckFailedCaption, MessageBoxButtons.OK, MessageBoxIcon.Error);
                                 }
-                            }
-                        }
-                        else
-                        {
-                            if (ReportErrors)
-                            {
-                                MessageBox.Show(
-                                    Resources.UpdateCheckFailedMessage,
-                                    Resources.UpdateCheckFailedCaption, MessageBoxButtons.OK, MessageBoxIcon.Error);
                             }
                         }
                     }
                 }
+            } 
+            finally
+            {
+                Running = false;
             }
 
-            Running = false;
+            
         }
 
         /// <summary>
